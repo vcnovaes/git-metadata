@@ -1,6 +1,7 @@
 """Module for run on terminal"""
 
 import subprocess
+import fire
 
 
 class FileNode:
@@ -103,40 +104,42 @@ class GitChange:
         return f"{self.type, self.filepath}"
 
 
-def __raw_git_data():
+def __raw_git_data(repository_location: str):
     return (
         subprocess.run(
             ["git", "log", "--name-status", "--pretty=format:"],
             stdout=subprocess.PIPE,
-            check=False,
+            check=True,
+            cwd=repository_location,
         )
         .stdout.decode()
         .splitlines()
     )
 
 
-def git_changes(root_dir: str = "src"):
+def git_changes(repository_location: str, root_dir: str = "src"):
     """Method that get git changes"""
     node_changes = [
         GitChange.from_string(raw_node)
-        for raw_node in __raw_git_data()
+        for raw_node in __raw_git_data(repository_location)
         if len(raw_node) > 0
     ]
     return [node for node in node_changes if node.filepath[:3] == root_dir]
 
 
-def main():
+def generate_changes_tree(repository: str, start_dir: str):
     """Main application function"""
-    root_dir = "src"
-    change_list = reversed(git_changes(root_dir))
-    tree = FileTree(root_dir)
+    change_list = reversed(git_changes(repository, start_dir))
+    tree = FileTree(start_dir)
     for change in change_list:
         if change.type == "A":
             tree.add_file(change.filepath)
         if change.type == "M":
             tree.register_modification(change.filepath)
+        if change.type == "D":
+            tree.delete_file(change.filepath)
     tree.print()
 
 
 if __name__ == "__main__":
-    main()
+    fire.Fire(generate_changes_tree)
